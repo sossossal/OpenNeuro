@@ -1,0 +1,72 @@
+name: "Release"
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    name: Create Release
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整的 Git 历史
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Build bridge (Rust)
+      run: |
+        cd bridge
+        cargo build --release
+        cp target/release/bridge openneuro-bridge-linux-x86_64
+    
+    - name: Generate changelog
+      run: |
+        python3 << 'EOF'
+        import subprocess
+        import re
+        
+        # 获取最后一个 tag
+        try:
+            last_tag = subprocess.check_output(['git', 'describe', '--tags', '--abbrev=0'], 
+                                               stderr=subprocess.DEVNULL).decode().strip()
+        except:
+            last_tag = None
+        
+        # 获取提交日志
+        if last_tag:
+            commits = subprocess.check_output(['git', 'log', f'{last_tag}..HEAD', '--oneline']).decode()
+        else:
+            commits = subprocess.check_output(['git', 'log', '-10', '--oneline']).decode()
+        
+        changelog = """# Changelog
+        
+        ## Changes since last release
+        
+        """
+        changelog += commits
+        
+        with open('CHANGELOG.md', 'w') as f:
+            f.write(changelog)
+        EOF
+    
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          openneuro-bridge-linux-x86_64
+          CHANGELOG.md
+          docs/PERFORMANCE.md
+        body_path: CHANGELOG.md
+        draft: false
+        prerelease: false
+

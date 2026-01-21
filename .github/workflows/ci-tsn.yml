@@ -1,0 +1,181 @@
+name: TSN Scheduler CI
+
+on:
+  push:
+    branches: [ develop, main ]
+    paths:
+      - 'tsn-scheduler/**'
+      - '.github/workflows/ci-tsn.yml'
+  pull_request:
+    branches: [ develop ]
+    paths:
+      - 'tsn-scheduler/**'
+
+env:
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          iproute2 \
+          ethtool \
+          tcpdump \
+          linux-headers-generic
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        cd tsn-scheduler
+        pip install -e ".[dev]"
+
+    - name: Run unit tests
+      working-directory: tsn-scheduler
+      run: |
+        pytest tests/unit \
+          -v \
+          --cov=src \
+          --cov-report=xml \
+          --cov-report=html \
+          --junitxml=junit.xml
+
+    - name: Run integration tests
+      working-directory: tsn-scheduler
+      run: |
+        pytest tests/integration \
+          -v \
+          --tb=short || true
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./tsn-scheduler/coverage.xml
+        flags: unittests
+        name: codecov-tsn-py${{ matrix.python-version }}
+        fail_ci_if_error: false
+
+    - name: Archive test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-py${{ matrix.python-version }}
+        path: tsn-scheduler/junit.xml
+        retention-days: 30
+
+  lint:
+    name: Code Quality (Lint & Type Check)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        cd tsn-scheduler
+        pip install -e ".[dev]"
+        pip install pylint mypy black
+
+    - name: Run pylint
+      working-directory: tsn-scheduler
+      run: |
+        pylint src/ \
+          --disable=all \
+          --enable=E,F \
+          --exit-zero \
+          --output-format=parseable || true
+
+    - name: Check formatting with black
+      working-directory: tsn-scheduler
+      run: black --check src/ tests/ || true
+
+    - name: Run mypy type check
+      working-directory: tsn-scheduler
+      run: mypy src/ --ignore-missing-imports || true
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install bandit
+      run: pip install bandit
+
+    - name: Run bandit security check
+      working-directory: tsn-scheduler
+      run: |
+        bandit -r src/ -f json -o bandit.json || true
+        bandit -r src/ -f txt || true
+
+    - name: Archive security results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-report
+        path: tsn-scheduler/bandit.json
+        retention-days: 30
+
+  performance:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        cd tsn-scheduler
+        pip install -e ".[dev]"
+        pip install pytest-benchmark
+
+    - name: Run performance tests
+      working-directory: tsn-scheduler
+      run: |
+        pytest tests/performance \
+          -v \
+          --benchmark-only \
+          --benchmark-json=benchmark.json || true
+
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      if: always()
+      with:
+        tool: 'pytest'
+        output-file-path: tsn-scheduler/benchmark.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: false

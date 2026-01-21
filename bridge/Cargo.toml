@@ -1,0 +1,23 @@
+[package]
+name = "openneuro-bridge"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "bridge"
+path = "src/main.rs"
+
+[dependencies]
+zenoh = { version = "0.10", features = ["unstable"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.11"
+async-trait = "0.1"
+futures = "0.3"
+chrono = "0.4"
+
+[dev-dependencies]
+criterion = "0.5"
+

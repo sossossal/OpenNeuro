@@ -1,0 +1,34 @@
+# Git attributes for consistency across platforms
+
+# Auto detect text files and normalize line endings to LF
+* text=auto
+
+# Source code
+*.h text eol=lf
+*.c text eol=lf
+*.hpp text eol=lf
+*.cpp text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.txt text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+
+# KiCad
+*.kicad_sch text eol=lf merge=union
+*.kicad_pcb text eol=lf merge=union
+*.kicad_pro text eol=lf
