@@ -25,7 +25,8 @@ void ptp_delay_handle_req(ptp_master_ctx_t *ctx,
     return;
 
   // 1. 验证 Sequence ID (通常不需要严格匹配 SYNC，但在某些 Profile 中有要求)
-  uint16_t seq_id = NTOHS(req->header.sequence_id);
+  uint16_t seq_id_raw = req->header.sequence_id;
+  uint16_t seq_id = NTOHS(seq_id_raw);
 
   // 2. 提取请求者的 Port Identity
   // const uint8_t *requestor = req->header.source_port_identity;
