@@ -2,170 +2,163 @@ name: "Build & Test"
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  
   # 检查代码格式和风格
   lint:
     runs-on: ubuntu-latest
     name: Code Lint & Format Check
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-    
-    - name: Install linters
-      run: |
-        pip install pylint black flake8 isort
-    
-    - name: Check Python formatting
-      run: |
-        black --check . 2>/dev/null || true
-        flake8 . --max-line-length=100 --ignore=E501,W503
-    
-    - name: Check C code formatting
-      run: |
-        sudo apt-get install -y clang-format
-        find firmware -name "*.c" -o -name "*.h" | xargs clang-format --dry-run
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install linters
+        run: |
+          pip install pylint black flake8 isort
+
+      - name: Check Python formatting
+        run: |
+          black --check . 2>/dev/null || true
+          flake8 . --max-line-length=100 --ignore=E501,W503
+
+      - name: Check C code formatting
+        run: |
+          sudo apt-get install -y clang-format
+          find firmware -name "*.c" -o -name "*.h" | xargs clang-format --dry-run
 
   # 编译 Rust 桥接器
   build-bridge:
     runs-on: ubuntu-latest
     name: Build ROS 2 ↔ Zenoh Bridge (Rust)
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-    
-    - name: Cache Rust build
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          bridge/target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Build bridge (Rust)
-      run: |
-        cd bridge
-        cargo build --release --verbose
-    
-    - name: Run bridge tests
-      run: |
-        cd bridge
-        cargo test --release --verbose
-    
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: bridge-binary
-        path: bridge/target/release/bridge
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            bridge/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build bridge (Rust)
+        run: |
+          cd bridge
+          cargo build --release --verbose
+
+      - name: Run bridge tests
+        run: |
+          cd bridge
+          cargo test --release --verbose
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-binary
+          path: bridge/target/release/bridge
 
   # 检查 ESP32 固件编译
   build-esp32:
     runs-on: ubuntu-latest
     name: Check ESP32 Firmware Build
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install ESP-IDF tools
-      run: |
-        mkdir -p ~/esp
-        cd ~/esp
-        git clone -b release/v5.2 --recursive https://github.com/espressif/esp-idf.git
-        cd esp-idf
-        ./install.sh
-    
-    - name: Build ESP32 firmware
-      run: |
-        source ~/esp/esp-idf/export.sh
-        cd firmware/zenoh-pico-esp32
-        idf.py build
-      continue-on-error: true  # ESP-IDF 依赖可能在 CI 中不完整
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ESP-IDF tools
+        run: |
+          mkdir -p ~/esp
+          cd ~/esp
+          git clone -b release/v5.2 --recursive https://github.com/espressif/esp-idf.git
+          cd esp-idf
+          ./install.sh
+
+      - name: Build ESP32 firmware
+        run: |
+          source ~/esp/esp-idf/export.sh
+          cd firmware/zenoh-pico-esp32
+          idf.py build
+        continue-on-error: true # ESP-IDF 依赖可能在 CI 中不完整
 
   # 检查 STM32H7 固件编译
   build-stm32:
     runs-on: ubuntu-latest
     name: Check STM32H7 Firmware Build
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install ARM GCC toolchain
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc-arm-none-eabi cmake
-    
-    - name: Build STM32H7 firmware
-      run: |
-        cd firmware/zenoh-pico-stm32
-        mkdir build && cd build
-        cmake -DCMAKE_TOOLCHAIN_FILE=../arm-toolchain.cmake ..
-        make -j4
-      continue-on-error: true
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ARM GCC toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi cmake
+
+      - name: Build STM32H7 firmware
+        run: |
+          cd firmware/zenoh-pico-stm32
+          mkdir build && cd build
+          cmake -DCMAKE_TOOLCHAIN_FILE=../arm-toolchain.cmake ..
+          make -j4
+        continue-on-error: true
 
   # 性能基准测试
   performance-test:
     runs-on: ubuntu-latest
     name: Performance Baseline Tests
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-    
-    - name: Install dependencies
-      run: |
-        pip install zenoh paho-mqtt
-    
-    - name: Run latency measurement
-      run: |
-        python3 tests/latency_tests/latency_measurement.py
-      continue-on-error: true
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v3
-      with:
-        name: latency-results
-        path: latency_report_*.json
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install zenoh paho-mqtt
+
+      - name: Run latency measurement
+        run: |
+          python3 tests/latency_tests/latency_measurement.py
+        continue-on-error: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: latency-results
+          path: latency_report_*.json
 
   # 文档检查
   docs-check:
     runs-on: ubuntu-latest
     name: Documentation Check
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Check markdown syntax
-      run: |
-        sudo apt-get install -y markdownlint
-        markdownlint "docs/**/*.md" "README.md" 2>/dev/null || true
-    
-    - name: Validate links in docs
-      run: |
-        python3 -m pip install markdown-link-checker
-        echo "Documentation check completed"
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check markdown syntax
+        run: |
+          sudo apt-get install -y markdownlint
+          markdownlint "docs/**/*.md" "README.md" 2>/dev/null || true
+
+      - name: Validate links in docs
+        run: |
+          python3 -m pip install markdown-link-checker
+          echo "Documentation check completed"
 
   # 生成报告
   report:
@@ -173,40 +166,39 @@ jobs:
     name: Generate Build Report
     needs: [lint, build-bridge, performance-test]
     if: always()
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download all artifacts
-      uses: actions/download-artifact@v3
-    
-    - name: Create build report
-      run: |
-        cat > BUILD_REPORT.md << 'EOF'
-        # OpenNeuro CI/CD Build Report
-        
-        **Build Date**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-        **Commit**: ${{ github.sha }}
-        **Branch**: ${{ github.ref }}
-        
-        ## Build Status
-        - Lint: ✓
-        - Bridge Build: ✓
-        - Firmware Check: ✓
-        - Tests: ✓
-        
-        ## Artifacts
-        - bridge-binary
-        - latency-results
-        
-        ---
-        Generated by GitHub Actions
-        EOF
-        cat BUILD_REPORT.md
-    
-    - name: Upload report
-      uses: actions/upload-artifact@v3
-      with:
-        name: build-report
-        path: BUILD_REPORT.md
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create build report
+        run: |
+          cat > BUILD_REPORT.md << 'EOF'
+          # OpenNeuro CI/CD Build Report
+
+          **Build Date**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          **Commit**: ${{ github.sha }}
+          **Branch**: ${{ github.ref }}
+
+          ## Build Status
+          - Lint: ✓
+          - Bridge Build: ✓
+          - Firmware Check: ✓
+          - Tests: ✓
+
+          ## Artifacts
+          - bridge-binary
+          - latency-results
+
+          ---
+          Generated by GitHub Actions
+          EOF
+          cat BUILD_REPORT.md
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-report
+          path: BUILD_REPORT.md
