@@ -95,8 +95,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: ptp-stack/build
-        continue-on-error: true
-        run: ctest --output-on-failure --verbose || echo "Tests skipped or failed"
+        run: ctest --output-on-failure --verbose
 
       - name: Collect coverage (Linux)
         if: runner.os == 'Linux' && matrix.compiler == 'gcc'
@@ -157,13 +156,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run CodeQL
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: cpp
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Build PTP Stack
+        run: |
+          cd ptp-stack
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --parallel 4
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
