@@ -44,7 +44,6 @@ jobs:
             build-essential \
             cmake \
             libgtest-dev \
-            gcov \
             lcov
 
       - name: Install dependencies (macOS)
@@ -83,11 +82,7 @@ jobs:
 
       - name: Configure CMake
         working-directory: ptp-stack/build
-        run: |
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG" \
-            -DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG"
+        run: cmake .. -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG" -DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG"
 
       - name: Build
         working-directory: ptp-stack/build

@@ -4,8 +4,8 @@
 #include "../master/clock.h"
 #include "../master/messages.h"
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-
 
 // Slave States
 typedef enum {

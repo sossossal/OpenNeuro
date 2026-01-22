@@ -1,5 +1,23 @@
 #include "delay.h"
 #include <stdio.h>
+#include <string.h>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <arpa/inet.h>
+#endif
+
+// Define macros if not already defined
+#ifndef NTOHS
+#define NTOHS(x) ntohs(x)
+#endif
+#ifndef HTONS
+#define HTONS(x) htons(x)
+#endif
+#ifndef HTONL
+#define HTONL(x) htonl(x)
+#endif
 
 void ptp_delay_handle_req(ptp_master_ctx_t *ctx,
                           const ptp_delay_req_message_t *req, uint64_t rx_ts) {
